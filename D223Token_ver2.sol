@@ -1,5 +1,8 @@
-// Токен 1 версии: 0xcCe968120e6Ded56F32fbfe5A2Ec06CBF1e7c8ED
-// https://etherscan.io/address/0xcCe968120e6Ded56F32fbfe5A2Ec06CBF1e7c8ED#code
+// Токен 2 версии: 0xfc12A27ED2F2faC872E679c15eFd334184D7F4F4
+
+/**
+ *Submitted for verification at Etherscan.io on 2024-10-01
+*/
 
 /**
  *Submitted for verification at Etherscan.io on 2023-12-01
@@ -13,36 +16,6 @@
 // D223 is a token of Dex223.io exchange.
 
 pragma solidity >=0.8.2;
-
-abstract contract IERC223 {
-    
-    function name()        public view virtual returns (string memory);
-    function symbol()      public view virtual returns (string memory);
-    function decimals()    public view virtual returns (uint8);
-    function totalSupply() public view virtual returns (uint256);
-    
-    /**
-     * @dev Returns the balance of the `who` address.
-     */
-    function balanceOf(address who) public virtual view returns (uint);
-        
-    /**
-     * @dev Transfers `value` tokens from `msg.sender` to `to` address
-     * and returns `true` on success.
-     */
-    function transfer(address to, uint value) public virtual returns (bool success);
-        
-    /**
-     * @dev Transfers `value` tokens from `msg.sender` to `to` address with `data` parameter
-     * and returns `true` on success.
-     */
-    function transfer(address to, uint value, bytes calldata data) public virtual returns (bool success);
-     
-     /**
-     * @dev Event that is fired on successful transfer.
-     */
-    event Transfer(address indexed from, address indexed to, uint value, bytes data);
-}
 
 abstract contract IERC223Recipient {
 
@@ -85,21 +58,6 @@ abstract contract IERC223Recipient {
     }
 }
 
-/**
- * @dev Interface of the ERC20 standard as defined in the EIP.
- */
-interface IERC20 {
-    function name() external view returns (string memory);
-    function symbol() external view returns (string memory);
-    function decimals() external view returns (uint8);
-    function totalSupply() external view returns (uint256);
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address to, uint256 value) external returns (bool);
-    function allowance(address owner, address spender) external view returns (uint256);
-    function approve(address spender, uint256 value) external returns (bool);
-    function transferFrom(address from, address to, uint256 value) external returns (bool);
-}
-
 library Address {
     /**
      * @dev Returns true if `account` is a contract.
@@ -131,7 +89,8 @@ contract D223Token {
      /**
      * @dev Event that is fired on successful transfer.
      */
-    event Transfer(address indexed from, address indexed to, uint value, bytes data);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event TransferData(bytes);
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
     string  private _name;
@@ -159,7 +118,8 @@ contract D223Token {
         _symbol   = "D223";
         _decimals = 18;
         balances[msg.sender] = 8000000000 * 1e18;
-        emit Transfer(address(0), msg.sender, balances[msg.sender], hex"000000");
+        emit Transfer(address(0), msg.sender, balances[msg.sender]);
+        emit TransferData(hex"000000");
         _totalSupply = balances[msg.sender];
     }
 
@@ -209,9 +169,9 @@ contract D223Token {
     /**
      * @dev See {IERC223-standard}.
      */
-    function standard() public view returns (string memory)
+    function standard() public view returns (uint32)
     {
-        return "223";
+        return 223;
     }
 
     
@@ -246,7 +206,8 @@ contract D223Token {
         if(Address.isContract(_to)) {
             IERC223Recipient(_to).tokenReceived(msg.sender, _value, _data);
         }
-        emit Transfer(msg.sender, _to, _value, _data);
+        emit Transfer(msg.sender, _to, _value);
+        emit TransferData(_data);
         return true;
     }
     
@@ -267,7 +228,7 @@ contract D223Token {
         if(Address.isContract(_to)) {
             IERC223Recipient(_to).tokenReceived(msg.sender, _value, _empty);
         }
-        emit Transfer(msg.sender, _to, _value, _empty);
+        emit Transfer(msg.sender, _to, _value);
         return true;
     }
 
@@ -296,7 +257,7 @@ contract D223Token {
         allowances[_from][msg.sender] -= _value;
         balances[_to] += _value;
         
-        emit Transfer(_from, _to, _value, hex"00000000");
+        emit Transfer(_from, _to, _value);
         
         return true;
     }
@@ -312,109 +273,5 @@ contract D223Token {
     {
         require(msg.sender == owner);
         owner = _owner;
-    }
-}
-
-abstract contract LinkOracle
-{
-   function latestAnswer() external view virtual returns (int256);
-}
-
-contract D223ICO {
-
-    address public owner = msg.sender;
-
-    uint256 public price_rate_USD = 1538; // Target price $0.00065 per D223 token.
-
-    address public USDT_contract  = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-    address public USDC_contract  = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    address public DAI_contract   = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-    address public ICO_token      = 0x7008D42622a8B4eF73e946833EA90E608de9e96B;
-
-    LinkOracle public ETH_price_oracle = LinkOracle(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
-
-    bool public active = true;
-
-    modifier requireActive
-    {
-        require(active == true);
-        _;
-    }
-
-    function setActive(bool _active) external
-    {
-        require(msg.sender == owner);
-        active = _active;
-    }
-
-    receive() external payable requireActive
-    {
-        IERC20(ICO_token).transfer(msg.sender, msg.value * uint256(ETH_price_oracle.latestAnswer())/1e8);
-    }
-
-    function tokenReceived(address _from, uint _value, bytes memory _data) public returns (bytes4)
-    {
-        require(msg.sender == ICO_token);
-        return this.tokenReceived.selector; //return 0x8943ec02;
-    }
-
-    function purchaseTokens(address _payment_token, uint256 _payment_amount) public requireActive
-    {
-        require(_payment_token == USDT_contract || _payment_token == USDC_contract || _payment_token == DAI_contract, "Wrong token");
-        if(_payment_token == USDT_contract || _payment_token == USDC_contract)
-        {
-            _payment_amount = _payment_amount * 1e12; // USDT and USDC have 6 decimals.
-        }
-        safeTransferFrom(_payment_token, msg.sender, address(this), _payment_amount);
-        IERC20(ICO_token).transfer(msg.sender, _payment_amount * price_rate_USD);
-    }
-
-    function getRewardAmount(address _payment_token, uint256 _deposit) public view returns (uint256)
-    {
-        if(_payment_token == USDT_contract || _payment_token == USDC_contract)
-        {
-            return _deposit * price_rate_USD * 1e12;
-        } 
-        if (_payment_token == DAI_contract) 
-        {
-            return _deposit * price_rate_USD;
-        }
-        if(_payment_token == address(0))     
-        {
-            return _deposit * price_rate_USD * uint256(ETH_price_oracle.latestAnswer())/1e8;
-        }
-        return 0;
-    }
-
-    function set(uint256 _price_USD, address _ICO_token, address _USDT, address _USDC, address _DAI) public
-    {
-        require(msg.sender == owner);
-        price_rate_USD     = _price_USD;
-        USDT_contract      = _USDT;
-        USDC_contract      = _USDC;
-        DAI_contract       = _DAI;
-        ICO_token          = _ICO_token;
-    }
-
-    function extractTokens(address _token, uint256 _amount) public
-    {
-        require(msg.sender == owner);
-        //IERC20(_token).transfer(msg.sender, _amount);
-        safeTransfer(_token, msg.sender, _amount);
-        if(_token == address(0))
-        {
-            payable(msg.sender).transfer(address(this).balance);
-        }
-    }
-    
-    function safeTransferFrom(address token, address from, address to, uint value) internal {
-        // bytes4(keccak256(bytes('transferFrom(address,address,uint256)')));
-        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, from, to, value));
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "Transfer failed");
-    }
-    
-    function safeTransfer(address token, address to, uint value) internal {
-        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, to, value));
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "Transfer failed");
     }
 }
